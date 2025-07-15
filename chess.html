@@ -56,7 +56,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            /* コマのサイズをマスの90%に設定（以前は75%） */
             font-size: calc(var(--square-size) * 0.9);
             position: relative;
             cursor: pointer;
@@ -71,12 +70,10 @@
             text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
         }
 
-        /* 選択されたマスのハイライト */
         .selected {
             background-color: var(--selected-color) !important;
         }
 
-        /* 移動可能なマスのハイライト */
         .legal-move-highlight::after {
             content: '';
             position: absolute;
@@ -87,12 +84,10 @@
             box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
         
-        /* 相手のコマを取れるマスのハイライト */
         .capture-move-highlight {
             box-shadow: inset 0 0 0 4px var(--legal-move-color);
         }
 
-        /* チェックされているキングのハイライト */
         .in-check {
             background: radial-gradient(circle, var(--check-color) 20%, transparent 70%);
         }
@@ -143,262 +138,286 @@
     </div>
 
     <script>
-        // DOM要素の取得
-         console.log("スクリプトの読み込みテストOK");
-        const boardElement = document.getElementById('board');
-        const statusTextElement = document.getElementById('status-text');
-        const resetButton = document.getElementById('reset-button');
+        // ★★★ 修正点 ★★★
+        // ページのHTMLがすべて読み込まれてからJavaScriptを実行するようにする
+        document.addEventListener('DOMContentLoaded', function() {
 
-        // --- 1. 盤面とコマの状態管理 ---
+            // DOM要素の取得
+            const boardElement = document.getElementById('board');
+            const statusTextElement = document.getElementById('status-text');
+            const resetButton = document.getElementById('reset-button');
 
-        // コマのUnicode表現
-        const pieceUnicode = {
-            'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wP': '♙',
-            'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bP': '♟︎'
-        };
+            // --- 1. 盤面とコマの状態管理 ---
 
-        // ゲームの状態を管理する変数
-        let boardState;
-        let currentPlayer;
-        let selectedPiece = null; // { row, col }
-        let legalMoves = [];
-        let isGameOver = false;
+            // コマのUnicode表現
+            const pieceUnicode = {
+                'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wP': '♙',
+                'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bP': '♟︎'
+            };
 
-        // 初期盤面をセットアップする関数
-        function initializeGame() {
-            boardState = [
-                ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
-                ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
-                ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
-            ];
-            currentPlayer = 'w';
-            selectedPiece = null;
-            legalMoves = [];
-            isGameOver = false;
-            updateStatus();
-            renderBoard();
-        }
+            // ゲームの状態を管理する変数
+            let boardState;
+            let currentPlayer;
+            let selectedPiece = null; // { row, col }
+            let legalMoves = [];
+            let isGameOver = false;
 
-        // --- 4. UI（ユーザーインターフェース）への表示 ---
-
-        // 盤面をHTMLに描画する関数
-        function renderBoard() {
-            boardElement.innerHTML = '';
-            const kingInCheckPos = findKingInCheck();
-
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const square = document.createElement('div');
-                    square.classList.add('square');
-                    square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                    square.dataset.row = row;
-                    square.dataset.col = col;
-
-                    const piece = boardState[row][col];
-                    if (piece) {
-                        const pieceElement = document.createElement('span');
-                        pieceElement.classList.add('piece');
-                        pieceElement.textContent = pieceUnicode[piece];
-                        square.appendChild(pieceElement);
-                    }
-                    
-                    // 選択中のコマをハイライト
-                    if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
-                        square.classList.add('selected');
-                    }
-
-                    // 合法手をハイライト
-                    if (legalMoves.some(move => move.row === row && move.col === col)) {
-                        if(boardState[row][col] !== null) {
-                           square.classList.add('capture-move-highlight');
-                        } else {
-                           square.classList.add('legal-move-highlight');
-                        }
-                    }
-                    
-                    // チェックされているキングをハイライト
-                    if (kingInCheckPos && kingInCheckPos.row === row && kingInCheckPos.col === col) {
-                        square.classList.add('in-check');
-                    }
-
-                    boardElement.appendChild(square);
-                }
-            }
-        }
-        
-        // --- 2. ユーザーによるコマの選択 ---
-
-        // マスがクリックされたときの処理
-        function handleSquareClick(event) {
-            if (isGameOver) return;
-
-            const square = event.target.closest('.square');
-            if (!square) return;
-
-            const row = parseInt(square.dataset.row);
-            const col = parseInt(square.dataset.col);
-            const piece = boardState[row][col];
-
-            // 合法手をクリックした場合 -> コマを移動
-            if (selectedPiece && legalMoves.some(move => move.row === row && move.col === col)) {
-                movePiece(selectedPiece.row, selectedPiece.col, row, col);
-                return;
-            }
-
-            // 自分のコマをクリックした場合 -> 選択
-            if (piece && piece.startsWith(currentPlayer)) {
-                selectedPiece = { row, col };
-                legalMoves = getFilteredLegalMoves(row, col);
-            } else {
-                // 何もない場所か相手のコマをクリックした場合 -> 選択解除
+            // 初期盤面をセットアップする関数
+            function initializeGame() {
+                boardState = [
+                    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+                    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+                    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+                ];
+                currentPlayer = 'w';
                 selectedPiece = null;
                 legalMoves = [];
+                isGameOver = false;
+                updateStatus();
+                renderBoard();
             }
 
-            renderBoard();
-        }
+            // --- 4. UI（ユーザーインターフェース）への表示 ---
 
-        // コマを移動させる関数
-        function movePiece(fromRow, fromCol, toRow, toCol) {
-            boardState[toRow][toCol] = boardState[fromRow][fromCol];
-            boardState[fromRow][fromCol] = null;
-            
-            // 選択状態をリセット
-            selectedPiece = null;
-            legalMoves = [];
-            
-            // ターンを交代
-            currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
-            
-            // ゲーム状態を更新
-            updateStatus();
-            renderBoard();
-            checkGameEnd();
-        }
-        
-        // ゲーム状態のテキストを更新
-        function updateStatus() {
-            let status = `${currentPlayer === 'w' ? '白' : '黒'}のターン`;
-            if (isKingInCheck(boardState, currentPlayer)) {
-                status += ' - チェックされています！';
+            // 盤面をHTMLに描画する関数
+            function renderBoard() {
+                boardElement.innerHTML = '';
+                const kingInCheckPos = findKingInCheck();
+
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const square = document.createElement('div');
+                        square.classList.add('square');
+                        square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                        square.dataset.row = row;
+                        square.dataset.col = col;
+
+                        const piece = boardState[row][col];
+                        if (piece) {
+                            const pieceElement = document.createElement('span');
+                            pieceElement.classList.add('piece');
+                            pieceElement.textContent = pieceUnicode[piece];
+                            square.appendChild(pieceElement);
+                        }
+                        
+                        // 選択中のコマをハイライト
+                        if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
+                            square.classList.add('selected');
+                        }
+
+                        // 合法手をハイライト
+                        if (legalMoves.some(move => move.row === row && move.col === col)) {
+                            if(boardState[row][col] !== null) {
+                                square.classList.add('capture-move-highlight');
+                            } else {
+                                square.classList.add('legal-move-highlight');
+                            }
+                        }
+                        
+                        // チェックされているキングをハイライト
+                        if (kingInCheckPos && kingInCheckPos.row === row && kingInCheckPos.col === col) {
+                            square.classList.add('in-check');
+                        }
+
+                        boardElement.appendChild(square);
+                    }
+                }
             }
-            statusTextElement.textContent = status;
-        }
+            
+            // --- 2. ユーザーによるコマの選択 ---
 
-        // ゲーム終了（チェックメイトまたはステイルメイト）を判定
-        function checkGameEnd() {
-            const allMoves = getAllLegalMovesForPlayer(currentPlayer);
-            if (allMoves.length === 0) {
-                isGameOver = true;
-                if (isKingInCheck(boardState, currentPlayer)) {
-                    statusTextElement.textContent = `チェックメイト！ ${currentPlayer === 'w' ? '黒' : '白'}の勝利！`;
+            // マスがクリックされたときの処理
+            function handleSquareClick(event) {
+                if (isGameOver) return;
+
+                const square = event.target.closest('.square');
+                if (!square) return;
+
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                const piece = boardState[row][col];
+
+                // 合法手をクリックした場合 -> コマを移動
+                if (selectedPiece && legalMoves.some(move => move.row === row && move.col === col)) {
+                    movePiece(selectedPiece.row, selectedPiece.col, row, col);
+                    return;
+                }
+
+                // 自分のコマをクリックした場合 -> 選択
+                if (piece && piece.startsWith(currentPlayer)) {
+                    selectedPiece = { row, col };
+                    legalMoves = getFilteredLegalMoves(row, col);
                 } else {
-                    statusTextElement.textContent = 'ステイルメイト！ 引き分けです。';
+                    // 何もない場所か相手のコマをクリックした場合 -> 選択解除
+                    selectedPiece = null;
+                    legalMoves = [];
                 }
+
+                renderBoard();
             }
-        }
 
-        // --- 3. 合法手の計算ロジック ---
-
-        // 自分のキングがチェック状態になる手を除外した合法手リストを取得
-        function getFilteredLegalMoves(row, col) {
-            const piece = boardState[row][col];
-            if (!piece) return [];
-
-            const moves = getPieceLegalMoves(piece, row, col, boardState);
+            // コマを移動させる関数
+            function movePiece(fromRow, fromCol, toRow, toCol) {
+                boardState[toRow][toCol] = boardState[fromRow][fromCol];
+                boardState[fromRow][fromCol] = null;
+                
+                // 選択状態をリセット
+                selectedPiece = null;
+                legalMoves = [];
+                
+                // ターンを交代
+                currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
+                
+                // ゲーム状態を更新
+                updateStatus();
+                renderBoard();
+                checkGameEnd();
+            }
             
-            // 各候補手について、実行後にキングがチェックされるか検証
-            return moves.filter(move => {
-                // 盤面をコピーして手をシミュレート
-                const tempBoard = JSON.parse(JSON.stringify(boardState));
-                tempBoard[move.row][move.col] = tempBoard[row][col];
-                tempBoard[row][col] = null;
-                // シミュレートした盤面で、自分のキングがチェックされていないか確認
-                return !isKingInCheck(tempBoard, currentPlayer);
-            });
-        }
+            // ゲーム状態のテキストを更新
+            function updateStatus() {
+                let status = `${currentPlayer === 'w' ? '白' : '黒'}のターン`;
+                if (isKingInCheck(boardState, currentPlayer)) {
+                    status += ' - チェックされています！';
+                }
+                statusTextElement.textContent = status;
+            }
 
-        // 指定された色のプレイヤーの全ての合法手を取得
-        function getAllLegalMovesForPlayer(playerColor) {
-            let allMoves = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const piece = boardState[r][c];
-                    if (piece && piece.startsWith(playerColor)) {
-                        const moves = getFilteredLegalMoves(r, c);
-                        allMoves.push(...moves);
+            // ゲーム終了（チェックメイトまたはステイルメイト）を判定
+            function checkGameEnd() {
+                const allMoves = getAllLegalMovesForPlayer(currentPlayer);
+                if (allMoves.length === 0) {
+                    isGameOver = true;
+                    if (isKingInCheck(boardState, currentPlayer)) {
+                        statusTextElement.textContent = `チェックメイト！ ${currentPlayer === 'w' ? '黒' : '白'}の勝利！`;
+                    } else {
+                        statusTextElement.textContent = 'ステイルメイト！ 引き分けです。';
                     }
                 }
             }
-            return allMoves;
-        }
 
-        // コマの種類に応じた合法手計算関数を呼び出す
-        function getPieceLegalMoves(piece, row, col, board) {
-            const type = piece[1];
-            switch (type) {
-                case 'P': return getPawnMoves(piece, row, col, board);
-                case 'R': return getRookMoves(piece, row, col, board);
-                case 'N': return getKnightMoves(piece, row, col, board);
-                case 'B': return getBishopMoves(piece, row, col, board);
-                case 'Q': return getQueenMoves(piece, row, col, board);
-                case 'K': return getKingMoves(piece, row, col, board);
-                default: return [];
-            }
-        }
-        
-        // 各コマの動きのロジック
-        function getPawnMoves(piece, row, col, board) {
-            const moves = [];
-            const color = piece[0];
-            const direction = (color === 'w') ? -1 : 1;
-            const startRow = (color === 'w') ? 6 : 1;
+            // --- 3. 合法手の計算ロジック ---
 
-            // 1マス前進
-            if (isWithinBounds(row + direction, col) && !board[row + direction][col]) {
-                moves.push({ row: row + direction, col: col });
-                // 初期位置からの2マス前進
-                if (row === startRow && !board[row + 2 * direction][col]) {
-                    moves.push({ row: row + 2 * direction, col: col });
-                }
+            // 自分のキングがチェック状態になる手を除外した合法手リストを取得
+            function getFilteredLegalMoves(row, col) {
+                const piece = boardState[row][col];
+                if (!piece) return [];
+
+                const moves = getPieceLegalMoves(piece, row, col, boardState);
+                
+                // 各候補手について、実行後にキングがチェックされるか検証
+                return moves.filter(move => {
+                    // 盤面をコピーして手をシミュレート
+                    const tempBoard = JSON.parse(JSON.stringify(boardState));
+                    tempBoard[move.row][move.col] = tempBoard[row][col];
+                    tempBoard[row][col] = null;
+                    // シミュレートした盤面で、自分のキングがチェックされていないか確認
+                    return !isKingInCheck(tempBoard, currentPlayer);
+                });
             }
-            // 斜め前の敵コマを取る
-            [-1, 1].forEach(dCol => {
-                const newRow = row + direction;
-                const newCol = col + dCol;
-                if (isWithinBounds(newRow, newCol)) {
-                    const targetPiece = board[newRow][newCol];
-                    if (targetPiece && targetPiece[0] !== color) {
-                        moves.push({ row: newRow, col: newCol });
+
+            // 指定された色のプレイヤーの全ての合法手を取得
+            function getAllLegalMovesForPlayer(playerColor) {
+                let allMoves = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = boardState[r][c];
+                        if (piece && piece.startsWith(playerColor)) {
+                            const moves = getFilteredLegalMoves(r, c);
+                            allMoves.push(...moves);
+                        }
                     }
                 }
-            });
-            return moves;
-        }
+                return allMoves;
+            }
 
-        function getRookMoves(piece, row, col, board) {
-            return getSlidingMoves(piece, row, col, board, [[-1, 0], [1, 0], [0, -1], [0, 1]]);
-        }
+            // コマの種類に応じた合法手計算関数を呼び出す
+            function getPieceLegalMoves(piece, row, col, board) {
+                const type = piece[1];
+                switch (type) {
+                    case 'P': return getPawnMoves(piece, row, col, board);
+                    case 'R': return getRookMoves(piece, row, col, board);
+                    case 'N': return getKnightMoves(piece, row, col, board);
+                    case 'B': return getBishopMoves(piece, row, col, board);
+                    case 'Q': return getQueenMoves(piece, row, col, board);
+                    case 'K': return getKingMoves(piece, row, col, board);
+                    default: return [];
+                }
+            }
+            
+            // 各コマの動きのロジック
+            function getPawnMoves(piece, row, col, board) {
+                const moves = [];
+                const color = piece[0];
+                const direction = (color === 'w') ? -1 : 1;
+                const startRow = (color === 'w') ? 6 : 1;
 
-        function getBishopMoves(piece, row, col, board) {
-            return getSlidingMoves(piece, row, col, board, [[-1, -1], [-1, 1], [1, -1], [1, 1]]);
-        }
+                // 1マス前進
+                if (isWithinBounds(row + direction, col) && !board[row + direction][col]) {
+                    moves.push({ row: row + direction, col: col });
+                    // 初期位置からの2マス前進
+                    if (row === startRow && !board[row + 2 * direction][col]) {
+                        moves.push({ row: row + 2 * direction, col: col });
+                    }
+                }
+                // 斜め前の敵コマを取る
+                [-1, 1].forEach(dCol => {
+                    const newRow = row + direction;
+                    const newCol = col + dCol;
+                    if (isWithinBounds(newRow, newCol)) {
+                        const targetPiece = board[newRow][newCol];
+                        if (targetPiece && targetPiece[0] !== color) {
+                            moves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                });
+                return moves;
+            }
 
-        function getQueenMoves(piece, row, col, board) {
-            return getSlidingMoves(piece, row, col, board, [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]);
-        }
-        
-        function getKingMoves(piece, row, col, board) {
-            const moves = [];
-            const color = piece[0];
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (dr === 0 && dc === 0) continue;
+            function getRookMoves(piece, row, col, board) {
+                return getSlidingMoves(piece, row, col, board, [[-1, 0], [1, 0], [0, -1], [0, 1]]);
+            }
+
+            function getBishopMoves(piece, row, col, board) {
+                return getSlidingMoves(piece, row, col, board, [[-1, -1], [-1, 1], [1, -1], [1, 1]]);
+            }
+
+            function getQueenMoves(piece, row, col, board) {
+                return getSlidingMoves(piece, row, col, board, [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]);
+            }
+            
+            function getKingMoves(piece, row, col, board) {
+                const moves = [];
+                const color = piece[0];
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const newRow = row + dr;
+                        const newCol = col + dc;
+                        if (isWithinBounds(newRow, newCol)) {
+                            const targetPiece = board[newRow][newCol];
+                            if (!targetPiece || targetPiece[0] !== color) {
+                                moves.push({ row: newRow, col: newCol });
+                            }
+                        }
+                    }
+                }
+                return moves;
+            }
+            
+            function getKnightMoves(piece, row, col, board) {
+                const moves = [];
+                const color = piece[0];
+                const knightMoves = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                knightMoves.forEach(([dr, dc]) => {
                     const newRow = row + dr;
                     const newCol = col + dc;
                     if (isWithinBounds(newRow, newCol)) {
@@ -407,109 +426,89 @@
                             moves.push({ row: newRow, col: newCol });
                         }
                     }
-                }
+                });
+                return moves;
             }
-            return moves;
-        }
-        
-        function getKnightMoves(piece, row, col, board) {
-            const moves = [];
-            const color = piece[0];
-            const knightMoves = [
-                [-2, -1], [-2, 1], [-1, -2], [-1, 2],
-                [1, -2], [1, 2], [2, -1], [2, 1]
-            ];
-            knightMoves.forEach(([dr, dc]) => {
-                const newRow = row + dr;
-                const newCol = col + dc;
-                if (isWithinBounds(newRow, newCol)) {
-                    const targetPiece = board[newRow][newCol];
-                    if (!targetPiece || targetPiece[0] !== color) {
-                        moves.push({ row: newRow, col: newCol });
-                    }
-                }
-            });
-            return moves;
-        }
 
-        // ルーク、ビショップ、クイーンのための汎用的な移動計算関数
-        function getSlidingMoves(piece, row, col, board, directions) {
-            const moves = [];
-            const color = piece[0];
-            directions.forEach(([dr, dc]) => {
-                for (let i = 1; i < 8; i++) {
-                    const newRow = row + i * dr;
-                    const newCol = col + i * dc;
-                    if (!isWithinBounds(newRow, newCol)) break;
-                    
-                    const targetPiece = board[newRow][newCol];
-                    if (targetPiece) {
-                        if (targetPiece[0] !== color) {
-                            moves.push({ row: newRow, col: newCol }); // 敵のコマは取れる
+            // ルーク、ビショップ、クイーンのための汎用的な移動計算関数
+            function getSlidingMoves(piece, row, col, board, directions) {
+                const moves = [];
+                const color = piece[0];
+                directions.forEach(([dr, dc]) => {
+                    for (let i = 1; i < 8; i++) {
+                        const newRow = row + i * dr;
+                        const newCol = col + i * dc;
+                        if (!isWithinBounds(newRow, newCol)) break;
+                        
+                        const targetPiece = board[newRow][newCol];
+                        if (targetPiece) {
+                            if (targetPiece[0] !== color) {
+                                moves.push({ row: newRow, col: newCol }); // 敵のコマは取れる
+                            }
+                            break; // 味方か敵のコマにぶつかったら、それ以上進めない
                         }
-                        break; // 味方か敵のコマにぶつかったら、それ以上進めない
+                        moves.push({ row: newRow, col: newCol }); // 何もないマス
                     }
-                    moves.push({ row: newRow, col: newCol }); // 何もないマス
-                }
-            });
-            return moves;
-        }
+                });
+                return moves;
+            }
 
-        // 盤面の範囲内かチェック
-        function isWithinBounds(row, col) {
-            return row >= 0 && row < 8 && col >= 0 && col < 8;
-        }
-        
-        // 指定した色のキングがチェックされているか判定する関数
-        function isKingInCheck(board, kingColor) {
-            const kingPos = findKing(board, kingColor);
-            if (!kingPos) return false; // キングがいない（ありえないが念のため）
-
-            const opponentColor = kingColor === 'w' ? 'b' : 'w';
+            // 盤面の範囲内かチェック
+            function isWithinBounds(row, col) {
+                return row >= 0 && row < 8 && col >= 0 && col < 8;
+            }
             
-            // 相手の全てのコマがキングを攻撃しているかチェック
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const piece = board[r][c];
-                    if (piece && piece.startsWith(opponentColor)) {
-                        // 注意：ここではチェック判定のための純粋な動きを見る
-                        const moves = getPieceLegalMoves(piece, r, c, board);
-                        if (moves.some(move => move.row === kingPos.row && move.col === kingPos.col)) {
-                            return true; // 攻撃されている
+            // 指定した色のキングがチェックされているか判定する関数
+            function isKingInCheck(board, kingColor) {
+                const kingPos = findKing(board, kingColor);
+                if (!kingPos) return false; // キングがいない（ありえないが念のため）
+
+                const opponentColor = kingColor === 'w' ? 'b' : 'w';
+                
+                // 相手の全てのコマがキングを攻撃しているかチェック
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board[r][c];
+                        if (piece && piece.startsWith(opponentColor)) {
+                            // 注意：ここではチェック判定のための純粋な動きを見る
+                            const moves = getPieceLegalMoves(piece, r, c, board);
+                            if (moves.some(move => move.row === kingPos.row && move.col === kingPos.col)) {
+                                return true; // 攻撃されている
+                            }
                         }
                     }
                 }
+                return false; // 攻撃されていない
             }
-            return false; // 攻撃されていない
-        }
 
-        // キングの位置を探すヘルパー関数
-        function findKing(board, color) {
-            const kingPiece = color + 'K';
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] === kingPiece) {
-                        return { row: r, col: c };
+            // キングの位置を探すヘルパー関数
+            function findKing(board, color) {
+                const kingPiece = color + 'K';
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        if (board[r][c] === kingPiece) {
+                            return { row: r, col: c };
+                        }
                     }
                 }
+                return null;
             }
-            return null;
-        }
-        
-        // 現在チェックされているキングの位置を返す
-        function findKingInCheck() {
-            if (isKingInCheck(boardState, currentPlayer)) {
-                return findKing(boardState, currentPlayer);
+            
+            // 現在チェックされているキングの位置を返す
+            function findKingInCheck() {
+                if (isKingInCheck(boardState, currentPlayer)) {
+                    return findKing(boardState, currentPlayer);
+                }
+                return null;
             }
-            return null;
-        }
 
-        // イベントリスナーの設定
-        boardElement.addEventListener('click', handleSquareClick);
-        resetButton.addEventListener('click', initializeGame);
+            // イベントリスナーの設定
+            boardElement.addEventListener('click', handleSquareClick);
+            resetButton.addEventListener('click', initializeGame);
 
-        // ゲーム開始
-        initializeGame();
+            // ゲーム開始
+            initializeGame();
+        });
     </script>
 
 </body>
