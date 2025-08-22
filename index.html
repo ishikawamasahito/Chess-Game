@@ -7,10 +7,9 @@
     <style>
         /* CSSカスタムプロパティで色とサイズを管理 */
         :root {
-            --board-size-desktop: 90vmin;
-            --square-size-desktop: calc(var(--board-size-desktop) / 8);
-            --board-size-mobile: 98vmin; /* モバイルでのボードサイズを調整 */
-            --square-size-mobile: calc(var(--board-size-mobile) / 8);
+            /* 盤面のサイズを固定値に変更 (px) */
+            --board-size: 600px;
+            --square-size: calc(var(--board-size) / 8);
             
             --light-square: #f0d9b5;
             --dark-square: #b58863;
@@ -52,8 +51,9 @@
         }
 
         #board {
-            width: var(--board-size-desktop);
-            height: var(--board-size-desktop);
+            /* 固定されたボードサイズを適用 */
+            width: var(--board-size);
+            height: var(--board-size);
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
@@ -69,7 +69,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: calc(var(--square-size-desktop) * 0.9);
+            /* 固定されたコマサイズを適用 */
+            font-size: calc(var(--square-size) * 0.9);
             position: relative;
             cursor: pointer;
             -webkit-user-select: none;
@@ -145,28 +146,65 @@
 
         #reset-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            box-shadow: 6px 6px 12px rgba(0,0,0,0.4);
         }
 
-        /* スマートフォン向けレスポンシブデザイン */
-        @media (max-width: 600px) {
+        /* プロモーション選択モーダルのスタイル */
+        #promotion-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none; /* 初期状態では非表示 */
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        #promotion-box {
+            background-color: #4a4a4a;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        #promotion-box h2 {
+            margin-top: 0;
+        }
+        #promotion-pieces {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+        .promotion-piece {
+            font-size: 4rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+        .promotion-piece:hover {
+            transform: scale(1.1);
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 画面幅が600px以下の場合のレイアウト調整 */
+        @media (max-width: 620px) {
+            #board {
+                width: 98vw;
+                height: 98vw;
+            }
+            .square {
+                font-size: calc(98vw / 8 * 0.9);
+            }
             h1 {
                 font-size: 1.5rem;
             }
-            
-            #board {
-                width: var(--board-size-mobile);
-                height: var(--board-size-mobile);
-            }
-
-            .square {
-                font-size: calc(var(--square-size-mobile) * 0.9);
-            }
-
             #status-text {
                 font-size: 1rem;
             }
-
             #reset-button {
                 padding: 0.6rem 1.2rem;
                 font-size: 0.9rem;
@@ -175,6 +213,42 @@
     </style>
 </head>
 <body>
+
+    <!--
+    ======================================
+    GitHubでこのゲームを公開する手順
+    ======================================
+    
+    GitHub Pagesは、GitHubリポジトリから直接Webページをホスティングできる無料のサービスです。
+    この手順は、デスクトップブラウザでの操作を前提としています。
+    
+    1. GitHubアカウントを作成する:
+       - GitHubの公式サイト https://github.com/ にアクセスし、「Sign up」からアカウントを作成します。
+       
+    2. 新しいリポジトリを作成する:
+       - GitHubにサインイン後、画面右上の「+」アイコンをクリックし、「New repository」を選択します。
+       - **Repository name（リポジトリ名）** を入力します（例: `my-chess-game`）。
+       - **Public（公開）** または **Private（非公開）** を選択します。一般公開したい場合は`Public`を選びます。
+       - **Add a README file** や他のオプションは、今回はチェックを入れずに進めます。
+       - 「Create repository」をクリックします。
+       
+    3. ファイルをリポジトリにアップロードする:
+       - 作成したリポジトリのページに移動すると、「uploading an existing file」というリンクが表示されます。これをクリックします。
+       - このHTMLファイルを直接ドラッグ＆ドロップします。
+       - ページの下部で、コミットメッセージ（例: `Initial commit for chess game`）を入力し、「Commit changes」をクリックします。
+       
+    4. GitHub Pagesを有効にする:
+       - リポジトリのページで「Settings」タブをクリックします。
+       - 左側のメニューから「Pages」を選択します。
+       - 「Branch」というドロップダウンメニューで、「**main**」または「**master**」（リポジトリのデフォルトブランチ名）を選択します。
+       - その隣のフォルダのドロップダウンメニューでは、「**/root**」を選択します。
+       - 「Save」ボタンをクリックします。
+       
+    5. 公開されたURLを確認する:
+       - 数分待つと、同じ「Pages」の設定ページの上部に、あなたのWebサイトのURLが表示されます。
+       - URLの形式は `https://<your-username>.github.io/<repository-name>/` となります。
+       - このURLをブラウザで開いて、公開されたゲームをプレイすることができます。
+    -->
 
     <div id="game-container">
         <h1>チェスゲーム</h1>
@@ -185,12 +259,24 @@
         <button id="reset-button">ゲームをリセット</button>
     </div>
 
+    <!-- プロモーション選択モーダル -->
+    <div id="promotion-modal">
+        <div id="promotion-box">
+            <h2>駒を選択してください</h2>
+            <div id="promotion-pieces">
+                <!-- JavaScriptで駒を追加 -->
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
 
             const boardElement = document.getElementById('board');
             const statusTextElement = document.getElementById('status-text');
             const resetButton = document.getElementById('reset-button');
+            const promotionModal = document.getElementById('promotion-modal');
+            const promotionPiecesContainer = document.getElementById('promotion-pieces');
 
             // 駒のUnicode表現
             const pieceUnicode = {
@@ -294,17 +380,55 @@
             }
 
             function movePiece(fromRow, fromCol, toRow, toCol) {
-                boardState[toRow][toCol] = boardState[fromRow][fromCol];
+                const movedPiece = boardState[fromRow][fromCol];
+
+                boardState[toRow][toCol] = movedPiece;
                 boardState[fromRow][fromCol] = null;
                 
                 selectedPiece = null;
                 legalMoves = [];
-                
+
+                // ポーンのプロモーションをチェック
+                if (movedPiece.startsWith('w') && movedPiece.endsWith('P') && toRow === 0) {
+                    showPromotionModal(movedPiece, toRow, toCol);
+                    return;
+                }
+                if (movedPiece.startsWith('b') && movedPiece.endsWith('P') && toRow === 7) {
+                    showPromotionModal(movedPiece, toRow, toCol);
+                    return;
+                }
+
                 currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
-                
                 updateStatus();
                 renderBoard();
                 checkGameEnd();
+            }
+
+            // プロモーションモーダルを表示する
+            function showPromotionModal(movedPiece, row, col) {
+                promotionPiecesContainer.innerHTML = '';
+                const color = movedPiece[0];
+                const piecesToPromoteTo = ['Q', 'R', 'B', 'N'];
+                piecesToPromoteTo.forEach(type => {
+                    const piece = color + type;
+                    const pieceElement = document.createElement('span');
+                    pieceElement.classList.add('promotion-piece', `${color === 'w' ? 'white-piece' : 'black-piece'}`);
+                    pieceElement.textContent = pieceUnicode[piece];
+                    pieceElement.dataset.pieceType = type;
+                    pieceElement.addEventListener('click', () => {
+                        // 選択された駒にプロモート
+                        boardState[row][col] = piece;
+                        
+                        // モーダルを非表示にし、ゲームを続行
+                        promotionModal.style.display = 'none';
+                        currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
+                        updateStatus();
+                        renderBoard();
+                        checkGameEnd();
+                    });
+                    promotionPiecesContainer.appendChild(pieceElement);
+                });
+                promotionModal.style.display = 'flex';
             }
             
             function updateStatus() {
