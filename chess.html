@@ -5,14 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>チェスゲーム</title>
     <style>
+        /* CSSカスタムプロパティで色とサイズを管理 */
         :root {
-            --board-size: 90vmin;
-            --square-size: calc(var(--board-size) / 8);
+            --board-size-desktop: 90vmin;
+            --square-size-desktop: calc(var(--board-size-desktop) / 8);
+            --board-size-mobile: 98vmin; /* モバイルでのボードサイズを調整 */
+            --square-size-mobile: calc(var(--board-size-mobile) / 8);
+            
             --light-square: #f0d9b5;
             --dark-square: #b58863;
             --selected-color: rgba(255, 255, 0, 0.5);
-            --legal-move-color: rgba(46, 139, 87, 0.5);
+            --legal-move-dot: rgba(46, 139, 87, 0.7);
             --check-color: rgba(255, 0, 0, 0.6);
+            --white-piece-color: #ffffff;
+            --black-piece-color: #000000;
+            --piece-text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
         }
 
         body {
@@ -25,22 +32,28 @@
             margin: 0;
             background-color: #333;
             color: white;
+            text-align: center;
+            padding: 1rem;
+            box-sizing: border-box;
         }
 
         h1 {
             margin-bottom: 1rem;
             text-shadow: 2px 2px 4px #000;
+            font-size: 2rem;
         }
 
         #game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
+            width: 100%;
+            max-width: 600px;
         }
 
         #board {
-            width: var(--board-size);
-            height: var(--board-size);
+            width: var(--board-size-desktop);
+            height: var(--board-size-desktop);
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
@@ -56,36 +69,46 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: calc(var(--square-size) * 0.9);
+            font-size: calc(var(--square-size-desktop) * 0.9);
             position: relative;
             cursor: pointer;
-            -webkit-user-select: none; /* Safari対応 */
-            user-select: none; /* テキスト選択を無効化 */
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .light { background-color: var(--light-square); }
         .dark { background-color: var(--dark-square); }
 
         .piece {
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+            text-shadow: var(--piece-text-shadow);
+            transition: transform 0.2s ease-out;
+        }
+        
+        .white-piece {
+            color: var(--white-piece-color);
+        }
+
+        .black-piece {
+            color: var(--black-piece-color);
         }
 
         .selected {
             background-color: var(--selected-color) !important;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
         }
 
         .legal-move-highlight::after {
             content: '';
             position: absolute;
-            width: 40%;
-            height: 40%;
-            background-color: var(--legal-move-color);
+            width: 30%;
+            height: 30%;
+            background-color: var(--legal-move-dot);
             border-radius: 50%;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            pointer-events: none;
         }
-        
+
         .capture-move-highlight {
-            box-shadow: inset 0 0 0 4px var(--legal-move-color);
+            box-shadow: inset 0 0 0 5px var(--legal-move-dot);
         }
 
         .in-check {
@@ -124,6 +147,31 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.4);
         }
+
+        /* スマートフォン向けレスポンシブデザイン */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            #board {
+                width: var(--board-size-mobile);
+                height: var(--board-size-mobile);
+            }
+
+            .square {
+                font-size: calc(var(--square-size-mobile) * 0.9);
+            }
+
+            #status-text {
+                font-size: 1rem;
+            }
+
+            #reset-button {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.9rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -138,31 +186,24 @@
     </div>
 
     <script>
-        // ★★★ 修正点 ★★★
-        // ページのHTMLがすべて読み込まれてからJavaScriptを実行するようにする
         document.addEventListener('DOMContentLoaded', function() {
 
-            // DOM要素の取得
             const boardElement = document.getElementById('board');
             const statusTextElement = document.getElementById('status-text');
             const resetButton = document.getElementById('reset-button');
 
-            // --- 1. 盤面とコマの状態管理 ---
-
-            // コマのUnicode表現
+            // 駒のUnicode表現
             const pieceUnicode = {
                 'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wP': '♙',
                 'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bP': '♟︎'
             };
 
-            // ゲームの状態を管理する変数
             let boardState;
             let currentPlayer;
-            let selectedPiece = null; // { row, col }
+            let selectedPiece = null;
             let legalMoves = [];
             let isGameOver = false;
 
-            // 初期盤面をセットアップする関数
             function initializeGame() {
                 boardState = [
                     ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
@@ -182,8 +223,6 @@
                 renderBoard();
             }
 
-            // --- 4. UI（ユーザーインターフェース）への表示 ---
-
             // 盤面をHTMLに描画する関数
             function renderBoard() {
                 boardElement.innerHTML = '';
@@ -201,16 +240,15 @@
                         if (piece) {
                             const pieceElement = document.createElement('span');
                             pieceElement.classList.add('piece');
+                            pieceElement.classList.add(piece.startsWith('w') ? 'white-piece' : 'black-piece');
                             pieceElement.textContent = pieceUnicode[piece];
                             square.appendChild(pieceElement);
                         }
                         
-                        // 選択中のコマをハイライト
                         if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
                             square.classList.add('selected');
                         }
 
-                        // 合法手をハイライト
                         if (legalMoves.some(move => move.row === row && move.col === col)) {
                             if(boardState[row][col] !== null) {
                                 square.classList.add('capture-move-highlight');
@@ -219,7 +257,6 @@
                             }
                         }
                         
-                        // チェックされているキングをハイライト
                         if (kingInCheckPos && kingInCheckPos.row === row && kingInCheckPos.col === col) {
                             square.classList.add('in-check');
                         }
@@ -229,8 +266,6 @@
                 }
             }
             
-            // --- 2. ユーザーによるコマの選択 ---
-
             // マスがクリックされたときの処理
             function handleSquareClick(event) {
                 if (isGameOver) return;
@@ -242,18 +277,15 @@
                 const col = parseInt(square.dataset.col);
                 const piece = boardState[row][col];
 
-                // 合法手をクリックした場合 -> コマを移動
                 if (selectedPiece && legalMoves.some(move => move.row === row && move.col === col)) {
                     movePiece(selectedPiece.row, selectedPiece.col, row, col);
                     return;
                 }
 
-                // 自分のコマをクリックした場合 -> 選択
                 if (piece && piece.startsWith(currentPlayer)) {
                     selectedPiece = { row, col };
                     legalMoves = getFilteredLegalMoves(row, col);
                 } else {
-                    // 何もない場所か相手のコマをクリックした場合 -> 選択解除
                     selectedPiece = null;
                     legalMoves = [];
                 }
@@ -261,25 +293,20 @@
                 renderBoard();
             }
 
-            // コマを移動させる関数
             function movePiece(fromRow, fromCol, toRow, toCol) {
                 boardState[toRow][toCol] = boardState[fromRow][fromCol];
                 boardState[fromRow][fromCol] = null;
                 
-                // 選択状態をリセット
                 selectedPiece = null;
                 legalMoves = [];
                 
-                // ターンを交代
                 currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
                 
-                // ゲーム状態を更新
                 updateStatus();
                 renderBoard();
                 checkGameEnd();
             }
             
-            // ゲーム状態のテキストを更新
             function updateStatus() {
                 let status = `${currentPlayer === 'w' ? '白' : '黒'}のターン`;
                 if (isKingInCheck(boardState, currentPlayer)) {
@@ -288,7 +315,6 @@
                 statusTextElement.textContent = status;
             }
 
-            // ゲーム終了（チェックメイトまたはステイルメイト）を判定
             function checkGameEnd() {
                 const allMoves = getAllLegalMovesForPlayer(currentPlayer);
                 if (allMoves.length === 0) {
@@ -301,27 +327,20 @@
                 }
             }
 
-            // --- 3. 合法手の計算ロジック ---
-
-            // 自分のキングがチェック状態になる手を除外した合法手リストを取得
             function getFilteredLegalMoves(row, col) {
                 const piece = boardState[row][col];
                 if (!piece) return [];
 
                 const moves = getPieceLegalMoves(piece, row, col, boardState);
                 
-                // 各候補手について、実行後にキングがチェックされるか検証
                 return moves.filter(move => {
-                    // 盤面をコピーして手をシミュレート
                     const tempBoard = JSON.parse(JSON.stringify(boardState));
                     tempBoard[move.row][move.col] = tempBoard[row][col];
                     tempBoard[row][col] = null;
-                    // シミュレートした盤面で、自分のキングがチェックされていないか確認
                     return !isKingInCheck(tempBoard, currentPlayer);
                 });
             }
 
-            // 指定された色のプレイヤーの全ての合法手を取得
             function getAllLegalMovesForPlayer(playerColor) {
                 let allMoves = [];
                 for (let r = 0; r < 8; r++) {
@@ -336,7 +355,6 @@
                 return allMoves;
             }
 
-            // コマの種類に応じた合法手計算関数を呼び出す
             function getPieceLegalMoves(piece, row, col, board) {
                 const type = piece[1];
                 switch (type) {
@@ -350,22 +368,18 @@
                 }
             }
             
-            // 各コマの動きのロジック
             function getPawnMoves(piece, row, col, board) {
                 const moves = [];
                 const color = piece[0];
                 const direction = (color === 'w') ? -1 : 1;
                 const startRow = (color === 'w') ? 6 : 1;
 
-                // 1マス前進
                 if (isWithinBounds(row + direction, col) && !board[row + direction][col]) {
                     moves.push({ row: row + direction, col: col });
-                    // 初期位置からの2マス前進
                     if (row === startRow && !board[row + 2 * direction][col]) {
                         moves.push({ row: row + 2 * direction, col: col });
                     }
                 }
-                // 斜め前の敵コマを取る
                 [-1, 1].forEach(dCol => {
                     const newRow = row + direction;
                     const newCol = col + dCol;
@@ -430,7 +444,6 @@
                 return moves;
             }
 
-            // ルーク、ビショップ、クイーンのための汎用的な移動計算関数
             function getSlidingMoves(piece, row, col, board, directions) {
                 const moves = [];
                 const color = piece[0];
@@ -443,45 +456,40 @@
                         const targetPiece = board[newRow][newCol];
                         if (targetPiece) {
                             if (targetPiece[0] !== color) {
-                                moves.push({ row: newRow, col: newCol }); // 敵のコマは取れる
+                                moves.push({ row: newRow, col: newCol });
                             }
-                            break; // 味方か敵のコマにぶつかったら、それ以上進めない
+                            break;
                         }
-                        moves.push({ row: newRow, col: newCol }); // 何もないマス
+                        moves.push({ row: newRow, col: newCol });
                     }
                 });
                 return moves;
             }
 
-            // 盤面の範囲内かチェック
             function isWithinBounds(row, col) {
                 return row >= 0 && row < 8 && col >= 0 && col < 8;
             }
             
-            // 指定した色のキングがチェックされているか判定する関数
             function isKingInCheck(board, kingColor) {
                 const kingPos = findKing(board, kingColor);
-                if (!kingPos) return false; // キングがいない（ありえないが念のため）
+                if (!kingPos) return false;
 
                 const opponentColor = kingColor === 'w' ? 'b' : 'w';
                 
-                // 相手の全てのコマがキングを攻撃しているかチェック
                 for (let r = 0; r < 8; r++) {
                     for (let c = 0; c < 8; c++) {
                         const piece = board[r][c];
                         if (piece && piece.startsWith(opponentColor)) {
-                            // 注意：ここではチェック判定のための純粋な動きを見る
                             const moves = getPieceLegalMoves(piece, r, c, board);
                             if (moves.some(move => move.row === kingPos.row && move.col === kingPos.col)) {
-                                return true; // 攻撃されている
+                                return true;
                             }
                         }
                     }
                 }
-                return false; // 攻撃されていない
+                return false;
             }
 
-            // キングの位置を探すヘルパー関数
             function findKing(board, color) {
                 const kingPiece = color + 'K';
                 for (let r = 0; r < 8; r++) {
@@ -494,7 +502,6 @@
                 return null;
             }
             
-            // 現在チェックされているキングの位置を返す
             function findKingInCheck() {
                 if (isKingInCheck(boardState, currentPlayer)) {
                     return findKing(boardState, currentPlayer);
@@ -502,14 +509,11 @@
                 return null;
             }
 
-            // イベントリスナーの設定
             boardElement.addEventListener('click', handleSquareClick);
             resetButton.addEventListener('click', initializeGame);
 
-            // ゲーム開始
             initializeGame();
         });
     </script>
-
 </body>
 </html>
